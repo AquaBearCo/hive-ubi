@@ -1,0 +1,55 @@
+# Use UBI as base image
+FROM registry.access.redhat.com/ubi8/ubi as base
+
+# Install necessary packages
+RUN dnf install -y tzdata openssl curl ca-certificates fontconfig glibc-langpack-en gzip tar nano wget procps-ng && \
+    dnf clean all
+	# Create hive user
+    adduser --no-create-home --uid 1000 hive
+# get JAVA_HOME
+RUN export JAVA_HOME="$(dirname $(readlink -f $(which java) | sed 's|/bin/java|/jre|'))"    
+
+# Copy archives
+COPY hadoop-*.tar.gz /opt/
+COPY apache-hive-*-bin.tar.gz /opt/
+COPY apache-tez-*-bin.tar.gz /opt/
+
+# Extract and clean up
+ARG HADOOP_VERSION
+ARG HIVE_VERSION
+ARG TEZ_VERSION
+RUN tar -xzvf /opt/hadoop-$HADOOP_VERSION.tar.gz -C /opt/ && \
+    rm -rf /opt/hadoop-$HADOOP_VERSION/share/doc/* && \
+    mv /opt/hadoop-$HADOOP_VERSION /opt/hadoop && \
+    rm -rf /opt/hadoop-$HADOOP_VERSION && \
+    tar -xzvf /opt/apache-hive-$HIVE_VERSION-bin.tar.gz -C /opt/ && \
+    rm -rf /opt/apache-hive-$HIVE_VERSION-bin/jdbc/* && \
+    mv /opt/apache-hive-$HIVE_VERSION-bin /opt/hive && \
+    rm -rf /opt/apache-hive-$HIVE_VERSION-bin && \
+    tar -xzvf /opt/apache-tez-$TEZ_VERSION-bin.tar.gz -C /opt && \
+    rm -rf /opt/apache-tez-$TEZ_VERSION-bin/share/* && \
+    mv /opt/apache-tez-$TEZ_VERSION-bin /opt/tez && \
+    rm -rf /opt/apache-tez-$TEZ_VERSION-bin && \
+    rm -rf /opt/*.tar.gz && \
+    mkdir -p /opt/hive/data/warehouse /home/hive/.beeline && \
+    chown -R hive:hive /opt/hive /opt/hadoop /opt/tez /opt/hive/data/warehouse /home/hive/.beeline
+COPY conf/hive-site.xml /opt/hive/conf/hive-site.xml
+# Set necessary environment variables
+ENV HADOOP_HOME=/opt/hadoop \
+    HIVE_HOME=/opt/hive \
+    TEZ_HOME=/opt/tez \
+    HIVE_VER=$HIVE_VERSION \
+    JAVA_HOME="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.412.b08-2.el8.x86_64/jre"
+ENV PATH=$JAVA_HOME/bin:$HIVE_HOME/bin:$HADOOP_HOME/bin:$PATH
+
+# Copy entrypoint and configuration
+COPY entrypoint.sh /
+COPY conf $HIVE_HOME/conf
+RUN chmod +x /entrypoint.sh
+
+USER hive
+WORKDIR /opt/hive
+
+EXPOSE 10000 10002 9083
+ENTRYPOINT ["sh", "-c", "/entrypoint.sh"]
+

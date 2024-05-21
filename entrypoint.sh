@@ -21,6 +21,7 @@ set -x
 
 : ${DB_DRIVER:=derby}
 
+
 SKIP_SCHEMA_INIT="${IS_RESUME:-false}"
 [[ $VERBOSE = "true" ]] && VERBOSE_MODE="--verbose" || VERBOSE_MODE=""
 
@@ -54,8 +55,12 @@ fi
 
 if [ "${SERVICE_NAME}" == "hiveserver2" ]; then
   export HADOOP_CLASSPATH=$TEZ_HOME/*:$TEZ_HOME/lib/*:$HADOOP_CLASSPATH
-  exec $HIVE_HOME/bin/hive --skiphadoopversion --skiphbasecp --service $SERVICE_NAME
+  #exec $HIVE_HOME/bin/hiveserver2 --skiphadoopversion --skiphbasecp --verbose ps
+  exec $HIVE_HOME/bin/hiveserver2 --skiphadoopversion --skiphbasecp --service $SERVICE_NAME 
+  #exec nohup $HIVE_HOME/bin/hiveserver2 --skiphadoopversion --skiphbasecp --verbose --service $SERVICE_NAME
 elif [ "${SERVICE_NAME}" == "metastore" ]; then
   export METASTORE_PORT=${METASTORE_PORT:-9083}
-  exec $HIVE_HOME/bin/hive --skiphadoopversion --skiphbasecp $VERBOSE_MODE --service $SERVICE_NAME
+  exec $HIVE_HOME/bin/hiveserver2 --skiphadoopversion --skiphbasecp --verbose --service $SERVICE_NAME 
+
+  #exec $HIVE_HOME/bin/hiveserver2 --skiphadoopversion --skiphbasecp $VERBOSE_MODE --service $SERVICE_NAME
 fi

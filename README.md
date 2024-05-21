@@ -16,24 +16,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 {% endcomment %}
 -->
+
+#hive-ub8
 ### Introduction
 
 ---
+Rebuild of Apache Hive docker container on UBI8.
+
+Goals:
+Keep with modern dependency/ patches.
+Run on UBI8
+
+
 Run Apache Hive inside docker container in pseudo-distributed mode, provide the following
 - Quick-start/Debugging/Prepare a test env for Hive
 
 
 ## Quickstart
 ### STEP 1: Pull the image
-- Pull the image from DockerHub: https://hub.docker.com/r/apache/hive/tags. 
+- Pull the image from DockerHub: https://hub.docker.com/r/aquabear/hive-ubi8/tags. 
 
 Here are the latest images:
 - 4.0.0
-- 4.0.0-beta-1
-- 3.1.3
+
 
 ```shell
-docker pull apache/hive:4.0.0
+docker pull aquabear/hive-ubi8:4.0.0
 ```
 ### STEP 2: Export the Hive version
 ```shell
@@ -43,7 +51,7 @@ export HIVE_VERSION=4.0.0
 ### STEP 3: Launch the HiveServer2 with an embedded Metastore.
 This is lightweight and for a quick setup, it uses Derby as metastore db.
 ```shell
-docker run -d -p 10000:10000 -p 10002:10002 --env SERVICE_NAME=hiveserver2 --name hive4 apache/hive:${HIVE_VERSION}
+docker run -d -p 10000:10000 -p 10002:10002 --env SERVICE_NAME=hiveserver2 --name hive4 aquabear/hive-ubi8:${HIVE_VERSION}
 ```
 
 ### STEP 4: Connect to beeline
@@ -53,7 +61,7 @@ docker exec -it hiveserver2 beeline -u 'jdbc:hive2://hiveserver2:10000/'
 
 #### Note: Launch Standalone Metastore To use standalone Metastore with Derby,
 ```shell
-docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --name metastore-standalone apache/hive:${HIVE_VERSION}
+docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --name metastore-standalone aquabear/hive-ubi8:${HIVE_VERSION}
 ```
 
 ### Detailed Setup
@@ -62,9 +70,7 @@ docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --name metastore-standal
 Apache Hive relies on Hadoop, Tez and some others to facilitate reading, writing, and managing large datasets. 
 The `build.sh` provides ways to build the image against specified version of the dependent, as well as build from source.
 
-##### Build from source
-```shell
-mvn clean package -pl packaging -DskipTests -Pdocker
+
 ```
 ##### Build with specified version
 There are some arguments to specify the component version:
@@ -73,8 +79,8 @@ There are some arguments to specify the component version:
 -tez <tez version>
 -hive <hive version> 
 ```
-If the version is not provided, it will read the version from current `pom.xml`:
-`project.version`, `hadoop.version` and `tez.version` for Hive, Hadoop and Tez respectively. 
+If the version is not provided, it will read the version from current `build.sh`:
+`hive_version`, `hadoop_version` and `tez_version` for Hive, Hadoop and Tez respectively. 
 
 For example, the following command uses Hive 4.0.0, Hadoop `hadoop.version` and Tez `tez.version` to build the image,
 ```shell
@@ -85,7 +91,7 @@ together with Hadoop 3.1.0 and Tez 0.10.1 to build the image,
 ```shell
 ./build.sh -hadoop 3.1.0 -tez 0.10.1
 ```
-After building successfully,  we can get a Docker image named `apache/hive` by default, the image is tagged by the provided Hive version.
+After building successfully,  we can get a Docker image named `aquabear/hive-ubi8` by default, the image is tagged by the provided Hive version.
 
 #### Run services
 
@@ -94,15 +100,26 @@ For example, if `-hive 4.0.0` is specified to build the image,
 ```shell
 export HIVE_VERSION=4.0.0
 ```
-or assuming that you're relying on current `project.version` from pom.xml,
-```shell
-export HIVE_VERSION=$(mvn -f pom.xml -q help:evaluate -Dexpression=project.version -DforceStdout)
-```
+
+- Dev Example
+  Using External MariaDB VM or Container - Dev Example
+
+T/S Command Version to Skip Entrypoint and go to bash.
+  ```shell
+    docker run -p 9083:9083 -p 10000:10000 -p 10002:10002 -it --entrypoint /bin/bash -h "hiveserver2" --env SERVICE_NAME=hiveserver2 --env DB_DRIVER=mysql --env IS_RESUME="true" --env SERVICE_OPTS="-Djavax.jdo.option.ConnectionDriverName=org.mariadb.jdbc.Driver -Djavax.jdo.option.ConnectionURL=jdbc:mariadb://10.10.15.121:3306/hive -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=hive" --mount type=bind,source=/opt/supportfiles/mariadb-java-client-3.3.3.jar,target=/opt/hive/lib/mariadb.jar -v /mnt/smb/data/hive_data:/opt/hive/data -v /mnt/smb/data/hive_conf/hive:/opt/hive/conf -v /mnt/smb/data/hive_conf/tez:/opt/tez/conf -v /mnt/smb/data/hive_conf/hadoop:/opt/hadoop/etc/hadoop --user 1000:1000 -v /mnt/smb/data/warehouse,target=/opt/hive/data/warehouse --name hiveserver2 aquabear/hive-ubi8:4.0.0
+  ```	
+  
+Launch with MariaDB VM
+  ```shell
+	docker run -d -p 9083:9083 -p 10000:10000 -p 10002:10002 --env SERVICE_NAME=hiveserver2 -h "hiveserver2" --env DB_DRIVER=mysql --env IS_RESUME="true" --env SERVICE_OPTS="-Djavax.jdo.option.ConnectionDriverName=org.mariadb.jdbc.Driver -Djavax.jdo.option.ConnectionURL=jdbc:mariadb://10.10.15.121:3306/hive -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=hive" --mount type=bind,source=/opt/supportfiles/mariadb-java-client-3.3.3.jar,target=/opt/hive/lib/mariadb.jar -v /mnt/smb/data/hive_data:/opt/hive/data -v /mnt/smb/data/hive_conf/hive:/opt/hive/conf -v /mnt/smb/data/hive_conf/tez:/opt/tez/conf -v /mnt/smb/data/hive_conf/hadoop:/opt/hadoop/etc/hadoop --user 1000:1000 -v /mnt/smb/data/warehouse,target=/opt/hive/data/warehouse --name hiveserver2 aquabear/hive-ubi8:4.0.0
+
+  ```
+
 - Metastore
 
 For a quick start, launch the Metastore with Derby,
   ```shell
-  docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --name metastore-standalone apache/hive:${HIVE_VERSION}
+  docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --name metastore-standalone aquabear/hive-ubi8:${HIVE_VERSION}
   ```
   Everything would be lost when the service is down. In order to save the Hive table's schema and data, start the container with an external Postgres and Volume to keep them,
 
@@ -111,7 +128,7 @@ For a quick start, launch the Metastore with Derby,
        --env SERVICE_OPTS="-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/metastore_db -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=password" \
        --mount source=warehouse,target=/opt/hive/data/warehouse \
        --mount type=bind,source=`mvn help:evaluate -Dexpression=settings.localRepository -q -DforceStdout`/org/postgresql/postgresql/42.7.3/postgresql-42.7.3.jar,target=/opt/hive/lib/postgres.jar \
-       --name metastore-standalone apache/hive:${HIVE_VERSION}
+       --name metastore-standalone aquabear/hive-ubi8:${HIVE_VERSION}
   ```
 
   If you want to use your own `hdfs-site.xml` or `yarn-site.xml` for the service, you can provide the environment variable `HIVE_CUSTOM_CONF_DIR` for the command. For instance, put the custom configuration file under the directory `/opt/hive/conf`, then run,
@@ -120,8 +137,18 @@ For a quick start, launch the Metastore with Derby,
    docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --env DB_DRIVER=postgres \
         -v /opt/hive/conf:/hive_custom_conf --env HIVE_CUSTOM_CONF_DIR=/hive_custom_conf \
         --mount type=bind,source=`mvn help:evaluate -Dexpression=settings.localRepository -q -DforceStdout`/org/postgresql/postgresql/42.7.3/postgresql-42.7.3.jar,target=/opt/hive/lib/postgres.jar \
-        --name metastore apache/hive:${HIVE_VERSION}
+        --name metastore aquabear/hive-ubi8:${HIVE_VERSION}
   ```
+
+  Using External MariaDB VM or Container - Dev Example
+
+  ```shell
+   docker run -d -p 9083:9083 --env SERVICE_NAME=metastore --env DB_DRIVER=postgres \
+        -v /opt/hive/conf:/hive_custom_conf --env HIVE_CUSTOM_CONF_DIR=/hive_custom_conf \
+        --mount type=bind,source=`mvn help:evaluate -Dexpression=settings.localRepository -q -DforceStdout`/org/postgresql/postgresql/42.7.3/postgresql-42.7.3.jar,target=/opt/hive/lib/postgres.jar \
+        --name metastore aquabear/hive-ubi8:${HIVE_VERSION}
+  ```
+
 
 NOTE:
 
@@ -132,7 +159,7 @@ then add "--env SCHEMA_COMMAND=upgradeSchema" to the command.
 
 Launch the HiveServer2 with an embedded Metastore,
    ```shell
-  docker run -d -p 10000:10000 -p 10002:10002 --env SERVICE_NAME=hiveserver2 --name hiveserver2-standalone apache/hive:${HIVE_VERSION}
+  docker run -d -p 10000:10000 -p 10002:10002 --env SERVICE_NAME=hiveserver2 --name hiveserver2-standalone aquabear/hive-ubi8:${HIVE_VERSION}
    ```
   or specify a remote Metastore if it's available,
    ```shell
@@ -140,7 +167,7 @@ Launch the HiveServer2 with an embedded Metastore,
          --env SERVICE_OPTS="-Dhive.metastore.uris=thrift://metastore:9083" \
          --env IS_RESUME="true" \
          --env VERBOSE="true" \
-         --name hiveserver2-standalone apache/hive:${HIVE_VERSION}
+         --name hiveserver2-standalone aquabear/hive-ubi8:${HIVE_VERSION}
    ```
 
 NOTE:
@@ -155,7 +182,7 @@ To skip schematool initialisation or upgrade for metastore use `IS_RESUME="true"
       --env SERVICE_OPTS="-Dhive.metastore.uris=thrift://metastore:9083" \
       --mount source=warehouse,target=/opt/hive/data/warehouse \
       --env IS_RESUME="true" \
-      --name hiveserver2 apache/hive:${HIVE_VERSION}
+      --name hiveserver2 aquabear/hive-ubi8:${HIVE_VERSION}
    ```
   
 - HiveServer2, Metastore
